@@ -53,20 +53,27 @@ func (s *State) redo(op LogMove) {
 // Apply puts op in log at a proper position, re-applies all subsequent operations
 // from log and changes s in-place.
 func (s *State) Apply(op Move) {
-	if len(s.Operations) == 0 {
+	var index int
+	for index = len(s.Operations); index > 0; index-- {
+		if s.Operations[index-1].Time <= op.Time {
+			break
+		}
+	}
+
+	if index == len(s.Operations) {
 		s.Operations = append(s.Operations, s.do(op))
 		return
 	}
 
-	lastIndex := len(s.Operations) - 1
-	lastOp := s.Operations[lastIndex]
-	if op.Time < lastOp.Time {
-		s.undo(lastOp)
-		s.Operations = s.Operations[:lastIndex]
-		s.Apply(op)
-		s.redo(lastOp)
-	} else {
-		s.Operations = append(s.Operations, s.do(op))
+	s.Operations = append(s.Operations[:index+1], s.Operations[index:]...)
+	for i := len(s.Operations) - 1; i > index; i-- {
+		s.undo(s.Operations[i])
+	}
+
+	s.Operations[index] = s.do(op)
+	
+	for i := index + 1; i < len(s.Operations); i++ {
+		s.Operations[i] = s.do(s.Operations[i].Move)
 	}
 }
 
